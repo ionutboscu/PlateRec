@@ -21,9 +21,12 @@ HEADERS  += dialog.h \
 
 FORMS    += dialog.ui
 
-INCLUDEPATH += /usr/local/include/opencv2
+INCLUDEPATH += /usr/local/include/opencv2 \
+              /usr/include/leptonica \
+              /usr/local/include/tesseract
 
 LIBS += -L/usr/local/lib \
+    -llept -ltesseract \
     -lopencv_ml \
     -lopencv_objdetect \
     -lopencv_stitching \

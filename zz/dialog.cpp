@@ -1,12 +1,25 @@
 #include "dialog.h"
 #include "ui_dialog.h"
+#include "unistd.h"
 
 #include <QtCore>
+#include <locale.h>
+
 static bool havePicture = false;
+static bool DEBUG = false;
+static int iteration = 0;
+CharSegment::CharSegment(){}
+CharSegment::CharSegment(Mat i, Rect p){
+    img=i;
+    pos=p;
+}
+
 Dialog::Dialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::Dialog)
 {
+    setlocale (LC_NUMERIC, "C");
+    //m_OCR = new tesseract::TessBaseAPI();
     ui->setupUi(this);
     capwebcam.open(0);
 
@@ -66,12 +79,12 @@ Mat Dialog::toMorphologyEx(Mat input)
 }
 
 bool Dialog::verifySizes(RotatedRect mr){
-
-    float error=0.4;
+//return true;
+    float error=0.3;
     //Spain car plate size: 52x11 aspect 4,7272
     float aspect=4.7272;
     //Set a min and max area. All other patchs are discarded
-    int min= 15*aspect*15; // minimum area
+    int min= 5*aspect*5; // minimum area
     int max= 125*aspect*125; // maximum area
     //Get only patchs that match to a respect ratio.
     float rmin= aspect-aspect*error;
@@ -80,7 +93,7 @@ bool Dialog::verifySizes(RotatedRect mr){
     int area = mr.size.height * mr.size.width;
     float r = (float)mr.size.width / (float)mr.size.height;
     if (r < 1)
-        r= (float)mr.size.height / (float)mr.size.width;
+        r = (float)mr.size.height / (float)mr.size.width;
 
     if (( area < min || area > max ) || ( r < rmin || r > rmax )) {
         return false;
@@ -119,36 +132,16 @@ vector<RotatedRect> Dialog::drawBlueContours(Mat input, Mat threshold, Mat &resu
             rects.push_back(mr);
         }
     }
-
     // Draw blue contours on a white image
     cv::drawContours(input, contours,
             -1, // draw all contours
-            cv::Scalar(0, 0, 255), // in blue
+            cv::Scalar(255, 0, 0), // in blue
             1); // with a thickness of 1
 
     QImage qImageBlueContours((uchar*)input.data, input.cols, input.rows, input.step, QImage::Format_RGB888);
     ui->label_14->setPixmap(QPixmap::fromImage(qImageBlueContours));
     input.copyTo(result);
     return rects;
-}
-
-void Dialog::processFrameAndUpdate()
-{
-    capwebcam.read(matOrig);
-    if (matOrig.empty() == true) return;
-
-    cv::cvtColor(matOrig, matOrig, CV_BGR2RGB);
-    QImage qImageOrig((uchar*)matOrig.data, matOrig.cols, matOrig.rows, matOrig.step, QImage::Format_RGB888);
-    ui->label->setPixmap(QPixmap::fromImage(qImageOrig));
-
-    Mat tmp = toGray(matOrig);
-    tmp = toBlur(tmp);
-    tmp = toSobel(tmp);
-    tmp = toThreshold(tmp);
-    tmp = toMorphologyEx(tmp);
-    Mat result;
-    vector<RotatedRect> rects = drawBlueContours(matOrig, tmp, result);
-    vector<Plate> plates = getPlate(matOrig, result, rects);
 }
 
 Mat Dialog::histeq(Mat in)
@@ -173,8 +166,9 @@ Mat Dialog::histeq(Mat in)
 
 vector<Plate> Dialog::getPlate(Mat input, Mat result, vector<RotatedRect> rects) {
     vector<Plate> output;
-
+    //qDebug() << "Line = " <<__LINE__;
     for (uint i = 0; i < rects.size(); i++) {
+         //qDebug() << "Line = " <<__LINE__;
         //For better rect cropping for each posible box
         //Make floodfill algorithm because the plate has white background
         //And then we can retrieve more clearly the contour box
@@ -213,8 +207,9 @@ vector<Plate> Dialog::getPlate(Mat input, Mat result, vector<RotatedRect> rects)
                 pointsInterest.push_back(itMask.pos());
 
         RotatedRect minRect = minAreaRect(pointsInterest);
-
+        // qDebug() << "Line = " <<__LINE__;
         if (verifySizes(minRect)) {
+ //qDebug() << "Line = " <<__LINE__;
             // rotated rectangle drawing
             Point2f rect_points[4]; minRect.points( rect_points );
             for (int j = 0; j < 4; j++ )
@@ -229,35 +224,34 @@ vector<Plate> Dialog::getPlate(Mat input, Mat result, vector<RotatedRect> rects)
             //Create and rotate image
             Mat img_rotated;
             warpAffine(input, img_rotated, rotmat, input.size(), CV_INTER_CUBIC);
-
             //Crop image
             Size rect_size = minRect.size;
             if (r < 1)
                 swap(rect_size.width, rect_size.height);
             Mat img_crop;
             getRectSubPix(img_rotated, rect_size, minRect.center, img_crop);
-
+ //qDebug() << "Line = " <<__LINE__;
             Mat resultResized;
             resultResized.create(33, 144, CV_8UC3);
-
             cv::resize(img_crop, resultResized, resultResized.size(), 0, 0, INTER_CUBIC);
             QImage qImagePlate((uchar*)resultResized.data, resultResized.cols, resultResized.rows, resultResized.step, QImage::Format_RGB888);
             ui->label_16->setPixmap(QPixmap::fromImage(qImagePlate));
-
+ //qDebug() << "Line = " <<__LINE__;
             //Equalize croped image
             Mat grayResult;
             cvtColor(resultResized, grayResult, CV_BGR2GRAY);
             QImage qImagePlateGray((uchar*)grayResult.data, grayResult.cols, grayResult.rows, grayResult.step, QImage::Format_Indexed8);
             ui->label_18->setPixmap(QPixmap::fromImage(qImagePlateGray));
-
+ //qDebug() << "Line = " <<__LINE__;
             blur(grayResult, grayResult, Size(3,3));
             QImage qImagePlateBlur((uchar*)grayResult.data, grayResult.cols, grayResult.rows, grayResult.step, QImage::Format_Indexed8);
             ui->label_20->setPixmap(QPixmap::fromImage(qImagePlateBlur));
-
+ //qDebug() << "Line = " <<__LINE__;
             grayResult = histeq(grayResult);
-//            if (saveRegions) {
+//            if (1==1) {
+//                qDebug() << "xxxxxxxxxxxxxxxxxxxxxxxxxx3";
 //                stringstream ss(stringstream::in | stringstream::out);
-//                ss << "tmp/" << filename << "_" << i << ".jpg";
+//                ss << "tmp/" << "poza" << "_" << i << ".jpg";
 //                imwrite(ss.str(), grayResult);
 //            }
 
@@ -267,14 +261,243 @@ vector<Plate> Dialog::getPlate(Mat input, Mat result, vector<RotatedRect> rects)
             output.push_back(Plate(grayResult, minRect.boundingRect()));
         }
     }
+     //qDebug() << "Line = " <<__LINE__;
     QImage qImagePlateContours((uchar*)result.data, result.cols, result.rows, result.step, QImage::Format_RGB888);
     ui->label_24->setPixmap(QPixmap::fromImage(qImagePlateContours));
 
-    if (output.size() > 0) {
-        havePicture = true;
-       // timer->stop();
-    }
     return output;
+}
+
+bool Dialog::verifyCharSizes(Mat r)
+{
+    //Char sizes 45x77
+    float aspect=45.0f/77.0f;
+    float charAspect= (float)r.cols/(float)r.rows;
+    float error=0.35;
+    float minHeight=15;
+    float maxHeight=28;
+    //We have a different aspect ratio for number 1, and it can be ~0.2
+    float minAspect=0.2;
+    float maxAspect=aspect+aspect*error;
+    //area of pixels
+    float area=countNonZero(r);
+    //bb area
+    float bbArea=r.cols*r.rows;
+    //% of pixel in area
+    float percPixels=area/bbArea;
+    DEBUG=false;
+    if (DEBUG)
+        cout << "Aspect: "<< aspect << " ["<< minAspect << "," << maxAspect << "] "  << "Area "<< percPixels <<" Char aspect " << charAspect  << " Height char "<< r.rows << "\n";
+    if( percPixels < 0.8 && charAspect > minAspect && charAspect < maxAspect && r.rows >= minHeight && r.rows < maxHeight) {
+        return true;
+    }
+    else {
+        return false;
+    }
+}
+
+vector<CharSegment> Dialog::segmentPlate(Plate plate)
+{
+    Mat input = plate.plateImg;
+    vector<CharSegment> output;
+
+    //Threshold input image
+    Mat img_threshold;
+    threshold(input, img_threshold, 60, 255, CV_THRESH_BINARY_INV);
+
+    //    DEBUG=false;
+    //    if(DEBUG)
+    //        imshow("Threshold plate", img_threshold);
+
+    Mat img_contours;
+    img_threshold.copyTo(img_contours);
+
+    //Find contours of possibles characters
+    vector< vector< Point> > contours;
+    findContours(img_contours,
+                 contours, // a vector of contours
+                 CV_RETR_EXTERNAL, // retrieve the external contours
+                 CV_CHAIN_APPROX_NONE); // all pixels of each contours
+
+    // Draw blue contours on a white image
+    cv::Mat result;
+    img_threshold.copyTo(result);
+    cvtColor(result, result, CV_GRAY2RGB);
+//    if(DEBUG)
+//        imshow("cvtColer", result);
+
+    cv::drawContours(result,contours,
+                     -1, // draw all contours
+                     cv::Scalar(255,0,0), // in blue
+                     1); // with a thickness of 1
+
+    //Start to iterate to each contour founded
+    vector<vector<Point> >::iterator itc = contours.begin();
+
+    //Remove patch that are no inside limits of aspect ratio and area.
+    while (itc != contours.end()) {
+
+        //Create bounding rect of object
+        Rect mr = boundingRect(Mat(*itc));
+        rectangle(result, mr, Scalar(0,255,0));
+
+        //Crop image
+        Mat auxRoi(img_threshold, mr);
+//        if(DEBUG)
+//            imshow("segmentauxRoi", auxRoi);
+        if (verifyCharSizes(auxRoi)){
+            auxRoi=preprocessChar(auxRoi);
+//            if(DEBUG)
+//                imshow("auxroi2", auxRoi);
+            output.push_back(CharSegment(auxRoi, mr));
+            rectangle(result, mr, Scalar(0,125,255));
+        }
+        ++itc;
+    }
+//    if(DEBUG)
+//        cout << "Num chars: " << output.size() << "\n";
+
+//    if(DEBUG)
+//        imshow("SEgmented Chars", result);
+    return output;
+}
+
+Mat Dialog::preprocessChar(Mat in)
+{
+    //Remap image
+    int h = in.rows;
+    int w = in.cols;
+    Mat transformMat = Mat::eye(2,3,CV_32F);
+    int m = max(w,h);
+    transformMat.at<float>(0,2)=m/2 - w/2;
+    transformMat.at<float>(1,2)=m/2 - h/2;
+
+    Mat warpImage(m,m, in.type());
+    warpAffine(in, warpImage, transformMat, warpImage.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar(0) );
+
+    Mat out;
+    cv::resize(warpImage, out, Size(20, 20));
+
+    return out;
+}
+
+string Dialog::saveCharsFromPlate(Plate *input)
+{
+
+    //Segment chars of plate
+    vector<CharSegment> segments = segmentPlate(*input);
+
+    if (segments.size() != 7) {
+        return "NU se poate detecta numarul";
+    }
+    tesseract::TessBaseAPI *myOCR =
+            new tesseract::TessBaseAPI();
+    if (myOCR->Init(NULL, "eng")) {
+      return "Could not initialize tesseract.";
+    }
+    std::vector<CharInfo> chars;
+    std::string output = "";
+    for (int i = 0; i < segments.size(); i++) {
+        //Preprocess each char for all images have same sizes
+        Mat ch = preprocessChar(segments[i].img);
+        QTime time = QTime::currentTime();
+        QString timeString = time.toString();
+
+        stringstream ss(stringstream::in | stringstream::out);
+        ss << "tmpChars/" << timeString.toStdString() << "_" << i << ".jpg";
+        imwrite(ss.str(),ch);
+
+        Pix *pix = pixRead(ss.str().c_str());
+        myOCR->SetImage(pix);
+
+        // [5]
+        CharInfo charInfo;
+        std::string val = myOCR->GetUTF8Text();
+        charInfo.charValue = val.substr(0, 1);
+        charInfo.pos = segments[i].pos.x;
+        chars.push_back(charInfo);
+       // printf("OCR output:%s", outText);
+        // [6]
+//        myOCR->Clear();
+//        myOCR->End();
+
+        pixDestroy(&pix);
+
+        //        //For each segment Extract Features
+        //        Mat f=features(ch,15);
+        //        //For each segment feature Classify
+        //        int character=classify(f);
+        //        input->chars.push_back(strCharacters[character]);
+        //        input->charsPos.push_back(segments[i].pos);
+       // qDebug() << "segments[" << i << "] = " << segments[i].pos.x;
+    }
+    myOCR->Clear();
+    myOCR->End();
+    //printf("\n");
+    //sort by pos
+    while (chars.size() > 0) {
+        int minPos = 100000;
+        int i, pos;
+        for (i = 0; i < chars.size(); i++) {
+            if (chars[i].pos < minPos) {
+                minPos = chars[i].pos;
+                pos = i;
+            }
+            //cout << "chars[" << i << "].pos = " << chars[i].pos << " si min pos =" << minPos << endl;
+        }
+       // cout << "chars.size=" << chars.size() << "minPos = " << minPos << " value = " << chars[minPos].charValue << " si pos =" << chars[minPos].pos << endl;
+        output.append(chars[pos].charValue);
+        chars.erase(chars.begin() + pos);
+    }
+    //output.append(chars[0].charValue);
+    return output;//input->str();
+}
+
+int Dialog::classify(Mat f){
+//    int result=-1;
+//    Mat output(1, numCharacters, CV_32FC1);
+//    ann.predict(f, output);
+//    Point maxLoc;
+//    double maxVal;
+//    minMaxLoc(output, 0, &maxVal, 0, &maxLoc);
+//    //We need know where in output is the max val, the x (cols) is the class.
+
+//    return maxLoc.x;
+}
+
+void Dialog::processFrameAndUpdate()
+{
+    capwebcam.read(matOrig);
+    if (matOrig.empty() == true) return;
+
+    cv::cvtColor(matOrig, matOrig, CV_BGR2RGB);
+    QImage qImageOrig((uchar*)matOrig.data, matOrig.cols, matOrig.rows, matOrig.step, QImage::Format_RGB888);
+    ui->label->setPixmap(QPixmap::fromImage(qImageOrig));
+
+    Mat tmp = toGray(matOrig);
+    tmp = toBlur(tmp);
+    tmp = toSobel(tmp);
+    tmp = toThreshold(tmp);
+    tmp = toMorphologyEx(tmp);
+    Mat result;
+    vector<RotatedRect> rects = drawBlueContours(matOrig, tmp, result);
+    vector<Plate> plates = getPlate(matOrig, result, rects);
+//    cout << "itaration = " << iteration << endl;
+    if (iteration++ == 1) {
+        iteration = 0;
+        for (int i = 0; i < plates.size(); i++) {
+            Plate plate = plates[i];
+            std::string number = saveCharsFromPlate(&plate);
+            cout << "================================================\n";
+            cout << "License plate number: "<< number << "\n";
+            cout << "================================================\n";
+            m_previousPlate = m_currentPlate;
+            m_currentPlate = number;
+        }
+        if (m_currentPlate.length() == 7 && m_currentPlate == m_previousPlate) {
+            ui->label_25->setText(QString(m_currentPlate.c_str()));
+        }
+    }
 }
 
 Dialog::~Dialog()
@@ -293,3 +516,4 @@ void Dialog::on_btn_clicked()
 //        ui->btn->setText("pause");
 //    }
 }
+
