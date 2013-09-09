@@ -2,16 +2,12 @@
 #define DIALOG_H
 
 #include <QDialog>
-
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <baseapi.h>
 #include <allheaders.h>
 
-#include "plate.h"
-
-using namespace std;
 using namespace cv;
 
 namespace Ui {
@@ -24,7 +20,16 @@ typedef struct
     int         pos;
 }
 CharInfo;
-class CharSegment{
+
+class Plate {
+    public:
+        Plate();
+        Plate(Mat img, Rect pos);
+        Rect position;
+        Mat plateImg;
+};
+
+class CharSegment {
 public:
     CharSegment();
     CharSegment(Mat i, Rect p);
@@ -41,21 +46,21 @@ public:
     ~Dialog();
 
 private slots:
-    void on_btn_clicked();
     Mat toGray(Mat mat);
     Mat toBlur(Mat mat);
     Mat toSobel(Mat mat);
     Mat toThreshold(Mat mat);
     Mat toMorphologyEx(Mat mat);
+    Mat histeq(Mat mat);
+    Mat preprocessChar(Mat in);
     vector<RotatedRect> drawBlueContours(Mat mat, Mat threshold, Mat &result);
     vector<Plate> getPlate(Mat mat, Mat result, vector<RotatedRect> rects);
     vector<CharSegment> segmentPlate(Plate plate);
     string saveCharsFromPlate(Plate *input);
-    Mat preprocessChar(Mat in);
+
     bool verifySizes(RotatedRect mr);
     bool verifyCharSizes(Mat r);
-    Mat histeq(Mat mat);
-    int classify(Mat f);
+
 
 public slots:
     void processFrameAndUpdate();
