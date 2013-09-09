@@ -373,10 +373,10 @@
   <widget class="QLabel" name="label_25">
    <property name="geometry">
     <rect>
-     <x>40</x>
-     <y>780</y>
-     <width>201</width>
-     <height>31</height>
+     <x>1120</x>
+     <y>670</y>
+     <width>451</width>
+     <height>111</height>
     </rect>
    </property>
    <property name="autoFillBackground">
@@ -389,14 +389,17 @@
   <widget class="QLabel" name="label_26">
    <property name="geometry">
     <rect>
-     <x>76</x>
-     <y>740</y>
-     <width>81</width>
-     <height>21</height>
+     <x>800</x>
+     <y>690</y>
+     <width>261</width>
+     <height>41</height>
     </rect>
    </property>
+   <property name="autoFillBackground">
+    <bool>true</bool>
+   </property>
    <property name="text">
-    <string>Numar detectat</string>
+    <string>Numar detectat:</string>
    </property>
   </widget>
  </widget>

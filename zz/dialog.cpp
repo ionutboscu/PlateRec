@@ -6,10 +6,11 @@
 #include<iostream>
 #include <string.h>
 #include <vector>
+#include <locale.h>
 
 using namespace std;
 
-static bool DEBUG = false;
+static bool DEBUG = true;
 static int iteration = 0;
 int thresh = 100;
 int max_thresh = 255;
@@ -26,17 +27,22 @@ CharSegment::CharSegment() {
 }
 
 CharSegment::CharSegment(Mat i, Rect p){
-    img=i;
-    pos=p;
+    img = i;
+    pos = p;
 }
 
 Dialog::Dialog(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::Dialog)
 {
+    setlocale (LC_NUMERIC, "C");
+    setenv("TESSDATA_PREFIX","./",0);
 
     ui->setupUi(this);
     capwebcam.open(0);
+
+    QFont f( "Arial", 24, QFont::Bold);
+    ui->label_26->setFont(f);
 
     if (capwebcam.isOpened() == false) {
         cout << "erorr - cannt load camera image!" << endl;
@@ -318,7 +324,7 @@ bool Dialog::verifyCharSizes(Mat r)
     if (DEBUG) {
         cout << "Aspect: "<< aspect << " ["<< minAspect << "," << maxAspect << "] "  << "Area "<< percPixels <<" Char aspect " << charAspect  << " Height char "<< r.rows << "\n";
     }
-    if( percPixels < 0.8 && charAspect > minAspect && charAspect < maxAspect && r.rows >= minHeight && r.rows < maxHeight) {
+    if (percPixels < 0.8 && charAspect > minAspect && charAspect < maxAspect && r.rows >= minHeight && r.rows < maxHeight) {
         return true;
     }
     else {
@@ -484,20 +490,20 @@ void Dialog::processFrameAndUpdate()
     vector<RotatedRect> rects = drawBlueContours(matOrig, tmp, result);
     vector<Plate> plates = getPlate(matOrig, result, rects);
 
-    if (iteration++ == 1) {
-        iteration = 0;
-        for (unsigned int i = 0; i < plates.size(); i++) {
-            Plate plate = plates[i];
-            std::string number = saveCharsFromPlate(&plate);
-            cout << "================================================\n";
-            cout << "License plate number: "<< number << "\n";
-            cout << "================================================\n";
-            m_previousPlate = m_currentPlate;
-            m_currentPlate = number;
-        }
-        if (m_currentPlate.length() == 7 && m_currentPlate == m_previousPlate) {
-            ui->label_25->setText(QString(m_currentPlate.c_str()));
-        }
+
+    for (unsigned int i = 0; i < plates.size(); i++) {
+        Plate plate = plates[i];
+        std::string number = saveCharsFromPlate(&plate);
+        cout << "================================================\n";
+        cout << "License plate number: "<< number << "\n";
+        cout << "================================================\n";
+        m_previousPlate = m_currentPlate;
+        m_currentPlate = number;
+    }
+    if ((m_currentPlate.length() == 7) && (m_currentPlate == m_previousPlate)) {
+        ui->label_25->setText(QString(m_currentPlate.c_str()));
+        QFont f( "Arial", 30, QFont::Bold);
+        ui->label_25->setFont(f);
     }
 }
 
